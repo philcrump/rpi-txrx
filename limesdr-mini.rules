@@ -1,0 +1,3 @@
+## Install with `sudo cp limesdr-mini.rules /etc/udev/rules.d/`
+#  then unplug and replug the limesdr mini
+SUBSYSTEMS=="usb", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="601f", MODE:="0666"
