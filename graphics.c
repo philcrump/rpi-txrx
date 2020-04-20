@@ -57,7 +57,7 @@ screen_pixel_t if_spectrum_buffer[IF_SPECTRUM_HEIGHT][IF_SPECTRUM_WIDTH] __attri
 #define IF_SPECTRUM_TIME_SMOOTH 0.8f
 float if_spectrum_smooth_buffer[IF_SPECTRUM_WIDTH] = { 0 };
 
-#define IF_SPECTRUM_POS_X     (800 - IF_SPECTRUM_WIDTH - 1)
+#define IF_SPECTRUM_POS_X     (SCREEN_WIDTH - IF_SPECTRUM_WIDTH - 1)
 #define IF_SPECTRUM_POS_Y     (FREQUENCY_POS_Y + FREQUENCY_HEIGHT + 8)
 
 /** IF Waterfall Display **/
@@ -66,8 +66,42 @@ float if_spectrum_smooth_buffer[IF_SPECTRUM_WIDTH] = { 0 };
 #define IF_WATERFALL_HEIGHT     120
 screen_pixel_t if_waterfall_buffer[IF_WATERFALL_HEIGHT][IF_WATERFALL_WIDTH] __attribute__ ((aligned (NEON_ALIGNMENT)));
 
-#define IF_WATERFALL_POS_X    (800 - IF_WATERFALL_WIDTH)
+#define IF_WATERFALL_POS_X    (SCREEN_WIDTH - IF_WATERFALL_WIDTH)
 #define IF_WATERFALL_POS_Y    (IF_SPECTRUM_POS_Y + IF_SPECTRUM_HEIGHT)
+
+/** PTT Button **/
+
+#define PTT_BUTTON_WIDTH      150
+#define PTT_BUTTON_HEIGHT     100
+screen_pixel_t ptt_button_buffer[PTT_BUTTON_HEIGHT][PTT_BUTTON_WIDTH] __attribute__ ((aligned (NEON_ALIGNMENT)));
+
+#define PTT_BUTTON_POS_X    (SCREEN_WIDTH - 5 - PTT_BUTTON_WIDTH)
+#define PTT_BUTTON_POS_Y    (SCREEN_HEIGHT - 5 - PTT_BUTTON_HEIGHT)
+
+
+const screen_pixel_t graphics_white_pixel =
+{
+  .Alpha = 0x80,
+  .Red = 0xFF,
+  .Green = 0xFF,
+  .Blue = 0xFF
+};
+
+const screen_pixel_t graphics_black_pixel =
+{
+  .Alpha = 0x80,
+  .Red = 0x00,
+  .Green = 0x00,
+  .Blue = 0x00
+};
+
+const screen_pixel_t graphics_red_pixel =
+{
+  .Alpha = 0x80,
+  .Red = 0xFF,
+  .Green = 0x00,
+  .Blue = 0x00
+};
 
 static void waterfall_cm_websdr(screen_pixel_t *pixel_ptr, uint8_t value)
 {
@@ -125,31 +159,77 @@ static void waterfall_render(uint32_t counter)
   }
 }
 
+void ptt_button_render_font_cb(int x, int y, screen_pixel_t *pixel_ptr)
+{
+  memcpy(&(ptt_button_buffer[y][x]), pixel_ptr, sizeof(screen_pixel_t));
+}
+
+extern bool ptt_pressed;
+void ptt_button_generate(void)
+{
+  uint32_t i, j;
+
+  for(i = 0; i < PTT_BUTTON_HEIGHT; i++)
+  {
+    memcpy(&(ptt_button_buffer[i][0]), &graphics_white_pixel, sizeof(screen_pixel_t));
+    memcpy(&(ptt_button_buffer[i][PTT_BUTTON_WIDTH-1]), &graphics_white_pixel, sizeof(screen_pixel_t));
+  }
+
+  for(j = 0; j < PTT_BUTTON_WIDTH; j++)
+  {
+    memcpy(&(ptt_button_buffer[0][j]), &graphics_white_pixel, sizeof(screen_pixel_t));
+    memcpy(&(ptt_button_buffer[PTT_BUTTON_HEIGHT-1][j]), &graphics_white_pixel, sizeof(screen_pixel_t));
+  }
+
+  const screen_pixel_t *ptt_button_background_pixel_ptr;
+  ptt_button_background_pixel_ptr = &graphics_black_pixel;
+  if(ptt_pressed)
+  {
+    ptt_button_background_pixel_ptr = &graphics_red_pixel;
+  }
+
+  for(i = 0+1; i < PTT_BUTTON_HEIGHT-1; i++)
+  {
+    for(j = 0+1; j < PTT_BUTTON_WIDTH-1; j++)
+    {
+      memcpy(&(ptt_button_buffer[i][j]), ptt_button_background_pixel_ptr, sizeof(screen_pixel_t));
+    }
+  }
+
+  char ptt_string[] = "PTT";
+  font_render_colour_string_with_callback(
+    (PTT_BUTTON_WIDTH - font_width_string(&font_dejavu_sans_36, ptt_string)) / 2,
+    (PTT_BUTTON_HEIGHT - font_dejavu_sans_36.height) / 2,
+    &font_dejavu_sans_36, ptt_button_background_pixel_ptr, &graphics_white_pixel,
+    ptt_string, ptt_button_render_font_cb
+  );
+}
+
+void ptt_button_render(void)
+{
+  for(uint32_t i = 0; i < PTT_BUTTON_HEIGHT; i++)
+  {
+    screen_setPixelLine(PTT_BUTTON_POS_X, PTT_BUTTON_POS_Y + i, PTT_BUTTON_WIDTH, ptt_button_buffer[i]);
+  }
+}
+
 static void spectrum_generate(uint8_t *fft_data)
 {
-  screen_pixel_t blank_pixel;
-  blank_pixel.Alpha = 0x80;
-  blank_pixel.Red = 0x00;
-  blank_pixel.Green = 0x00;
-  blank_pixel.Blue = 0x00;
+  const screen_pixel_t selected_marker_pixel =
+  {
+    .Alpha = 0x80,
+    .Red = 0x50,
+    .Green = 0x50,
+    .Blue = 0x50
+  };
 
-  screen_pixel_t selected_marker_pixel;
-  selected_marker_pixel.Alpha = 0x80;
-  selected_marker_pixel.Red = 0x50;
-  selected_marker_pixel.Green = 0x50;
-  selected_marker_pixel.Blue = 0x50;
-
-  screen_pixel_t selected_band_pixel;
-  selected_band_pixel.Alpha = 0x80;
-  selected_band_pixel.Red = 0x1A;
-  selected_band_pixel.Green = 0x1A;
-  selected_band_pixel.Blue = 0x1A;
-
-  screen_pixel_t spectrum_pixel;
-  spectrum_pixel.Alpha = 0x80;
-  spectrum_pixel.Red = 0xFF;
-  spectrum_pixel.Green = 0xFF;
-  spectrum_pixel.Blue = 0xFF;
+  const screen_pixel_t selected_band_pixel =
+  {
+    .Alpha = 0x80,
+    .Red = 0x1A,
+    .Green = 0x1A,
+    .Blue = 0x1A
+  };
 
   uint32_t value;
   uint32_t i, j;
@@ -158,7 +238,7 @@ static void spectrum_generate(uint8_t *fft_data)
   {
     for(j = 0; j < MAIN_SPECTRUM_WIDTH; j++)
     {
-      memcpy(&(main_spectrum_buffer[i][j]), &blank_pixel, sizeof(screen_pixel_t));
+      memcpy(&(main_spectrum_buffer[i][j]), &graphics_black_pixel, sizeof(screen_pixel_t));
     }
   }
 
@@ -201,7 +281,7 @@ static void spectrum_generate(uint8_t *fft_data)
 
     for(j = (MAIN_SPECTRUM_HEIGHT-1); j > MAIN_SPECTRUM_HEIGHT-value-1; j--)
     {
-      memcpy(&(main_spectrum_buffer[j][i]), &spectrum_pixel, sizeof(screen_pixel_t));
+      memcpy(&(main_spectrum_buffer[j][i]), &graphics_white_pixel, sizeof(screen_pixel_t));
     }
   }
 }
@@ -214,25 +294,20 @@ static void spectrum_render(void)
   }
 }
 
-void frequency_render_font_cb(int x, int y, screen_pixel_t *pixel_ptr)
+static void frequency_render_font_cb(int x, int y, screen_pixel_t *pixel_ptr)
 {
   memcpy(&(frequency_buffer[y][x]), pixel_ptr, sizeof(screen_pixel_t));
 }
 
-void frequency_generate(void)
+static void frequency_generate(void)
 {
-  screen_pixel_t blank_pixel;
-  blank_pixel.Alpha = 0x80;
-  blank_pixel.Red = 0x00;
-  blank_pixel.Green = 0x00;
-  blank_pixel.Blue = 0x00;
-
+  uint32_t i, j;
   /* Clear buffer */
-  for(uint32_t i = 0; i < FREQUENCY_HEIGHT; i++)
+  for(i = 0; i < FREQUENCY_HEIGHT; i++)
   {
-    for(uint32_t j = 0; j <FREQUENCY_WIDTH; j++)
+    for(j = 0; j <FREQUENCY_WIDTH; j++)
     {
-      memcpy(&(frequency_buffer[i][j]), &blank_pixel, sizeof(screen_pixel_t));
+      memcpy(&(frequency_buffer[i][j]), &graphics_black_pixel, sizeof(screen_pixel_t));
     }
   }
 
@@ -245,7 +320,7 @@ void frequency_generate(void)
   free(freq_string);
 }
 
-void frequency_render(void)
+static void frequency_render(void)
 {
   /* Render Frequency display buffer */
   for(uint32_t i = 0; i < FREQUENCY_HEIGHT; i++)
@@ -279,9 +354,12 @@ void graphics_frequency_newdata(void)
 {
   frequency_generate();
   frequency_render();
+
+  ptt_button_generate();
+  ptt_button_render();
 }
 
- void if_waterfall_generate(uint32_t counter, uint8_t *fft_data)
+static void if_waterfall_generate(uint32_t counter, uint8_t *fft_data)
 {
   screen_pixel_t new_pixel;
   new_pixel.Alpha = 0x80;
@@ -300,7 +378,7 @@ void graphics_frequency_newdata(void)
   }
 }
 
- void if_waterfall_render(uint32_t counter)
+static void if_waterfall_render(uint32_t counter)
 {
   for(uint32_t i = 0; i < IF_WATERFALL_HEIGHT; i++)
   {
@@ -310,31 +388,23 @@ void graphics_frequency_newdata(void)
   }
 }
 
- void if_spectrum_generate(uint8_t *fft_data)
+static void if_spectrum_generate(uint8_t *fft_data)
 {
-  screen_pixel_t blank_pixel;
-  blank_pixel.Alpha = 0x80;
-  blank_pixel.Red = 0x00;
-  blank_pixel.Green = 0x00;
-  blank_pixel.Blue = 0x00;
+  const screen_pixel_t selected_marker_pixel =
+  {
+    .Alpha = 0x80,
+    .Red = 0x50,
+    .Green = 0x50,
+    .Blue = 0x50
+  };
 
-  screen_pixel_t selected_marker_pixel;
-  selected_marker_pixel.Alpha = 0x80;
-  selected_marker_pixel.Red = 0x50;
-  selected_marker_pixel.Green = 0x50;
-  selected_marker_pixel.Blue = 0x50;
-
-  screen_pixel_t selected_band_pixel;
-  selected_band_pixel.Alpha = 0x80;
-  selected_band_pixel.Red = 0x1A;
-  selected_band_pixel.Green = 0x1A;
-  selected_band_pixel.Blue = 0x1A;
-
-  screen_pixel_t spectrum_pixel;
-  spectrum_pixel.Alpha = 0x80;
-  spectrum_pixel.Red = 0xFF;
-  spectrum_pixel.Green = 0xFF;
-  spectrum_pixel.Blue = 0xFF;
+  const screen_pixel_t selected_band_pixel =
+  {
+    .Alpha = 0x80,
+    .Red = 0x1A,
+    .Green = 0x1A,
+    .Blue = 0x1A
+  };
 
   uint32_t value;
   uint32_t i, j;
@@ -343,7 +413,7 @@ void graphics_frequency_newdata(void)
   {
     for(j = 0; j < IF_SPECTRUM_WIDTH; j++)
     {
-      memcpy(&(if_spectrum_buffer[i][j]), &blank_pixel, sizeof(screen_pixel_t));
+      memcpy(&(if_spectrum_buffer[i][j]), &graphics_black_pixel, sizeof(screen_pixel_t));
     }
   }
 
@@ -372,12 +442,12 @@ void graphics_frequency_newdata(void)
 
     for(j = (IF_SPECTRUM_HEIGHT - 1); j > IF_SPECTRUM_HEIGHT-value-1; j--)
     {
-      memcpy(&(if_spectrum_buffer[j][i]), &spectrum_pixel, sizeof(screen_pixel_t));
+      memcpy(&(if_spectrum_buffer[j][i]), &graphics_white_pixel, sizeof(screen_pixel_t));
     }
   }
 }
 
- void if_spectrum_render(void) 
+static void if_spectrum_render(void) 
 {
   for(uint32_t i = 0; i < IF_SPECTRUM_HEIGHT; i++)
   {

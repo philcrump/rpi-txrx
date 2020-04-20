@@ -20,6 +20,8 @@
 #include "graphics.h"
 #include "timing.h"
 
+bool ptt_pressed = false;
+
 static bool touch_detecthw(char **touchscreen_path_ptr)
 {
   FILE * fp;
@@ -211,6 +213,16 @@ static int if_drag_last_pos_x = 0;
 #define MAIN_WF_AY  180
 #define MAIN_WF_AH  300
 
+#define MAIN_WF_AX  0
+#define MAIN_WF_AW  512
+#define MAIN_WF_AY  180
+#define MAIN_WF_AH  300
+
+#define PTT_BTN_AX  645
+#define PTT_BTN_AW  150
+#define PTT_BTN_AY  375
+#define PTT_BTN_AH  100
+
 #define areaTouched(ax, aw, ay, ah)     ((touch_x > ax) && (touch_x < (ax + aw)) && (touch_y > ay) && (touch_y < (ay + ah)))
 #define xTouched(ax, aw)                ((touch_x > ax) && (touch_x < (ax + aw)))
 
@@ -218,6 +230,7 @@ static void touch_process(int touch_type, int touch_x, int touch_y)
 {
     if(touch_type == TOUCH_EVENT_START)
     {
+        /* Main Waterfall tuning drag */
         if(!main_drag_ongoing
         && areaTouched(MAIN_WF_AX, MAIN_WF_AW, MAIN_WF_AY, MAIN_WF_AH))
         {
@@ -227,11 +240,20 @@ static void touch_process(int touch_type, int touch_x, int touch_y)
             main_drag_last_pos_x = touch_x;
         }
 
+        /* IF Waterfall tuning drag */
         if(!if_drag_ongoing
         && areaTouched(IF_WF_AX, IF_WF_AW, IF_WF_AY, IF_WF_AH))
         {
             if_drag_ongoing = true;
             if_drag_last_pos_x = touch_x;
+        }
+
+        /* PTT Button */
+        if(areaTouched(PTT_BTN_AX, PTT_BTN_AW, PTT_BTN_AY, PTT_BTN_AH))
+        {
+            ptt_pressed = true;
+            ptt_button_generate();
+            ptt_button_render();
         }
     }
 
@@ -260,6 +282,7 @@ static void touch_process(int touch_type, int touch_x, int touch_y)
     {
         main_drag_ongoing = false;
         if_drag_ongoing = false;
+        ptt_pressed = false;
     }
 }
 

@@ -7,6 +7,7 @@
 #include <signal.h>
 #include <pthread.h>
 #include <fftw3.h>
+#include <getopt.h>
 
 #include "screen.h"
 #include "mouse.h"
@@ -24,10 +25,23 @@
 
 static bool app_exit = false;
 
+extern double frequency_downconversion;
+
 void sigint_handler(int sig)
 {
     (void)sig;
     app_exit = true;
+}
+
+void _print_usage(void)
+{
+    printf(
+        "\n"
+        "Usage: txrx [options]\n"
+        "\n"
+        "  -d, --downconversion <number>  Set the RX LO  Default: 9750000\n"
+        "\n"
+    );
 }
 
 static pthread_t screen_thread_obj;
@@ -47,6 +61,27 @@ int main(int argc, char* argv[])
 
   signal(SIGINT, sigint_handler);
   signal(SIGTERM, sigint_handler);
+
+  static const struct option long_options[] = {
+        { "downconversion",    required_argument, 0, 'd' },
+        { 0,                   0,                 0,  0  }
+    };
+    
+    int c, opt;
+    while((c = getopt_long(argc, argv, "d:", long_options, &opt)) != -1)
+    {
+        switch(c)
+        {        
+        case 'd': /* --downconversion <number> */
+            frequency_downconversion = atof(optarg);
+            break;
+
+        case '?':
+            _print_usage();
+            return(0);
+        }
+    }
+
 
   /* Initialise screen and splash */
   if(!screen_init())

@@ -20,6 +20,11 @@
 
 lime_fft_buffer_t lime_fft_buffer;
 
+double frequency_tx =  1200000e3;
+double frequency_rx = 10489750e3;
+double frequency_downconversion = 9750e6;
+double bandwidth = 512e3; // 512ks
+
 //Device structure, should be initialize to NULL
 static lms_device_t* device = NULL;
 
@@ -227,10 +232,6 @@ void *lime_thread(void *arg)
 {
     bool *exit_requested = (bool *)arg;
 
-    double frequency_tx = 739750e3;
-    double frequency_rx = 739750e3;
-    double bandwidth = 512e3; // 512ks
-
     //Find devices
     int n;
     lms_info_str_t list[8]; //should be large enough to hold all detected devices
@@ -261,7 +262,7 @@ void *lime_thread(void *arg)
 
     device_info = LMS_GetDeviceInfo(device);
 
-    printf("Device: %s, Serial: 0x%016" PRIx64 "\n",
+    printf("Lime Device: %s, Serial: 0x%016" PRIx64 "\n",
         device_info->deviceName,
         device_info->boardSerialNumber
     );
@@ -305,12 +306,24 @@ void *lime_thread(void *arg)
         return NULL;
     }
 
+    printf("Lime Frequency Plan:\n"
+            " - TX Center: %.0fHz\n"
+            " - RX Center: %.0fHz\n"
+            "   - Downconversion LO: %.0fHz\n"
+            "   - IF Center: %.0fHz\n",
+        frequency_tx,
+        frequency_rx,
+            frequency_downconversion, 
+            (frequency_rx - frequency_downconversion)        
+    );
+
     //Set RX center frequency
-    if (LMS_SetLOFrequency(device, LMS_CH_RX, 0, frequency_rx) != 0)
+    if (LMS_SetLOFrequency(device, LMS_CH_RX, 0, (frequency_rx - frequency_downconversion)) != 0)
     {
         LMS_Close(device);
         return NULL;
     }
+
     //Set TX center frequency
     //Automatically selects antenna port
     if (LMS_SetLOFrequency(device, LMS_CH_TX, 0, frequency_tx) != 0)
@@ -333,29 +346,29 @@ void *lime_thread(void *arg)
         fprintf(stderr, "Warning : LMS_GetSampleRate() : %s\n", LMS_GetLastErrorMessage());
         return NULL;
     }
-    printf("TX Samplerate: Host: %.1fKs, RF: %.1fKs\n", (sr_host/1000.0), (sr_rf/1000.0));
+    printf("Lime TX Samplerate: Host: %.1fKs, RF: %.1fKs\n", (sr_host/1000.0), (sr_rf/1000.0));
 
     if (LMS_GetSampleRate(device, LMS_CH_RX, 0, &sr_host, &sr_rf) < 0)
     {
         fprintf(stderr, "Warning : LMS_GetSampleRate() : %s\n", LMS_GetLastErrorMessage());
         return NULL;
     }
-    printf("RX Samplerate: Host: %.1fKs, RF: %.1fKs\n", (sr_host/1000.0), (sr_rf/1000.0));
+    printf("Lime RX Samplerate: Host: %.1fKs, RF: %.1fKs\n", (sr_host/1000.0), (sr_rf/1000.0));
 
 
     if(!limesdr_calibration_loadFile(device_cal_filename))
     {
-        printf("No calibration found, running calibration!\n");
+        printf("Lime Calibration: No file found, running calibration!\n");
 
         if(limesdr_calibration_run(bandwidth))
         {
             limesdr_calibration_saveFile(device_cal_filename);
-            printf("Saved calibration to file (%s)\n", device_cal_filename);
+            printf("Lime Calibration: Saved to file (%s)\n", device_cal_filename);
         }
     }
     else
     {
-        printf("Loaded calibration from file (%s)\n", device_cal_filename);
+        printf("Lime Calibration: Loaded from file (%s)\n", device_cal_filename);
     }
 
     //Set RX gain
@@ -365,7 +378,7 @@ void *lime_thread(void *arg)
         return NULL;
     }
     //Set TX gain
-    if (LMS_SetNormalizedGain(device, LMS_CH_TX, 0, 0.4) != 0)
+    if (LMS_SetNormalizedGain(device, LMS_CH_TX, 0, 0.5) != 0)
     {
         LMS_Close(device);
         return NULL;
