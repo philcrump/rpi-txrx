@@ -202,7 +202,7 @@ void if_demod_init(void)
 
     input_size = fft_size - taps_length + 1;
     overlap_length = taps_length - 1;
-    printf("IF Demod: (fft_size = %d) = (taps_length = %d) + (input_size = %d) - 1 (overlap_length = %d) = taps_length - 1\n", fft_size, taps_length, input_size, overlap_length );
+    //printf("IF Demod: (fft_size = %d) = (taps_length = %d) + (input_size = %d) - 1 (overlap_length = %d) = taps_length - 1\n", fft_size, taps_length, input_size, overlap_length );
     if(fft_size <= 2)
     {
         fprintf(stderr,"IF Demod: FFT size error. (fft_size <= 2)");
