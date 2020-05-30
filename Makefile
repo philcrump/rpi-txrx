@@ -2,11 +2,26 @@
 # Compile flags
 
 CC = gcc
-COPT = -O3
-CFLAGS = -Wall -Wextra -Wpedantic -Werror -std=gnu11 -D_GNU_SOURCE
+COPT = -O3 -march=native -mtune=native
+
+# Help detection for ARM SBCs, using devicetree
+F_CHECKDTMODEL = $(if $(findstring $(1),$(shell cat /sys/firmware/devicetree/base/model 2>/dev/null)),$(2))
+# Jetson Nano is detected correctly
+# Raspberry Pi 2 / Zero is detected correctly
+DTMODEL_RPI2 = Raspberry Pi 2 Model B 
+DTMODEL_RPI3 = Raspberry Pi 3 Model B 
+DTMODEL_RPI4 = Raspberry Pi 4 Model B 
+COPT_RPI2 = -mfpu=neon-vfpv4
+COPT_RPI34 = -mfpu=neon-fp-armv8
+COPT += $(call F_CHECKDTMODEL,$(DTMODEL_RPI2),$(COPT_RPI2))
+COPT += $(call F_CHECKDTMODEL,$(DTMODEL_RPI3),$(COPT_RPI34))
+COPT += $(call F_CHECKDTMODEL,$(DTMODEL_RPI4),$(COPT_RPI34))
+# Required for NEON, warning: may lead to loss of floating-point precision
+COPT += -funsafe-math-optimizations
+
+CFLAGS = -Wall -Wextra -Wpedantic -Werror -std=gnu11 -D_GNU_SOURCE -DNEON_OPTS -pthread
 CFLAGS += -D BUILD_VERSION="\"$(shell git describe --dirty --always)\""	\
 		-D BUILD_DATE="\"$(shell date '+%Y-%m-%d_%H:%M:%S')\"" \
-		-pthread -march=native -mtune=native -mfpu=neon -mvectorize-with-neon-quad -DNEON_OPTS
 
 BIN = txrx
 
